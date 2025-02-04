@@ -7,8 +7,13 @@ set -eu
 # 標準入力がパイプのときはDebian ash とNetBSD shでは動作しない
 # （FreeBSD shでは動作する）
 #   prun.sh: 32: set: Cannot set tty process group (Invalid argument)
-if [ -p /dev/stdin ]; then
-  echo "When stdin is a pipe, not supported in Debian ash and NetBSD sh"
+if [ ! "${PRUN_FIFO:-}" ]; then
+  export PRUN_FIFO=1
+  [ -e /tmp/fifo ] || mkfifo /tmp/fifo
+  cat > /tmp/fifo &
+  "$0" "$@" < /tmp/fifo
+  rm /tmp/fifo
+  exit
 fi
 
 task() {
