@@ -4,27 +4,45 @@ set -eu
 
 . ./prun.sh
 
-# 標準入力がパイプのときはDebian ash とNetBSD shでは動作しない
-# （FreeBSD shでは動作する）
-#   prun.sh: 32: set: Cannot set tty process group (Invalid argument)
-if [ ! "${PRUN_FIFO:-}" ]; then
-  export PRUN_FIFO=1
-  [ -e /tmp/fifo ] || mkfifo /tmp/fifo
-  cat > /tmp/fifo &
-  "$0" "$@" < /tmp/fifo
-  rm /tmp/fifo
-  exit
-fi
+# 標準入力がパイプのときはzshでCTRL+Cで停止できない
+SELF="$0"
+check() {
+  [ -t 0 ] && return
+  if [ -p "${PRUN_FIFO:-}" ]; then
+    exec 0< "$PRUN_FIFO"
+    rm "$PRUN_FIFO"
+    unset PRUN_FIFO
+  else
+    PRUN_FIFO=$(mktemp -u)
+    mkfifo "$PRUN_FIFO"
+    cat > "$PRUN_FIFO" &
+    export PRUN_FIFO
+    "$SELF" "$@"
+    exit
+  fi
+}
+check "$@"
 
 task() {
+  trap "echo task $1: int" INT
   r=$((($(od -An -tu1 -N1 /dev/urandom) % 5) + 3))
   echo "task $1: sleep $r"
-  sleep "$r"
+  env sleep "$r"
   echo "task $1: done"
 }
 
 # CTRL+Cを押したときの中断処理
-trap 'prun_abort' INT
+cleanup() {
+  trap '' HUP INT QUIT PIPE TERM
+  prun_abort
+  trap - EXIT "$1"
+  [ "$1" = EXIT ] || prun_logger "kill self: $1"
+  [ "$1" = EXIT ] || kill -s "$1" $$ || exit 1
+}
+
+for i in EXIT HUP INT QUIT PIPE TERM; do
+  trap 'cleanup '"$i" "$i"
+done
 
 # 初期化（4: 最大並列実行数）
 prun_maxprocs 4
