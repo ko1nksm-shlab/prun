@@ -44,6 +44,17 @@ for i in EXIT HUP INT QUIT PIPE TERM; do
   trap 'cleanup '"$i" "$i"
 done
 
+suspend() {
+  prun_suspend
+  kill -s STOP $$ || exit 1
+}
+trap 'suspend' TSTP
+
+resume() {
+  prun_resume
+}
+trap 'resume' CONT
+
 # 初期化（4: 最大並列実行数）
 prun_maxprocs 4
 

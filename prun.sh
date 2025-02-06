@@ -10,7 +10,7 @@ prun_maxprocs() {
 prun() {
   until [ "$PRUN_PIDS_COUNT" -lt "$PRUN_MAX" ]; do
     [ "$PRUN_ABORTED" ] && prun_killall && return 1
-    env sleep 0.2
+    (trap '' TSTP; env sleep 0.3)
     prun_sweep
   done
 
@@ -74,14 +74,28 @@ prun_sweep() {
   done
 }
 
-# （内部使用）すべてのプロセスの停止
-# shellcheck disable=SC2120
 prun_killall() {
   prun_logger "prun_killall"
-  eval "set -- $PRUN_PIDS"
-  while [ $# -gt 0 ]; do
-    kill -s INT -- -"$1" 2>/dev/null || :
-    shift
+  prun_signal INT
+}
+
+prun_suspend() {
+  prun_logger "prun_suspend"
+  prun_signal TSTP
+}
+
+prun_resume() {
+  prun_logger "prun_resume"
+  prun_signal CONT
+}
+
+# （内部使用）すべてのプロセスの停止
+# shellcheck disable=SC2120
+prun_signal() {
+  eval "set -- $1 $PRUN_PIDS"
+  while [ $# -gt 1 ]; do
+    kill -s "$1" -- -"$2" 2>/dev/null || :
+    eval "shift 2; set -- $1 \"\$@\""
   done
 }
 
