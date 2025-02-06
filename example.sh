@@ -21,11 +21,16 @@ check() {
     exit
   fi
 }
-check "$@"
+
+if type mkfifo >/dev/null 2>&1; then
+  check "$@"
+else
+  echo mkfifo not found >&2
+fi
 
 task() {
   trap "echo task $1: int" INT
-  r=$((($(od -An -tu1 -N1 /dev/urandom) % 5) + 3))
+  r=$((($(dd if=/dev/urandom 2>/dev/null | od -An -tu1 -N1) % 5) + 3))
   echo "task $1: sleep $r"
   env sleep "$r"
   echo "task $1: done"
