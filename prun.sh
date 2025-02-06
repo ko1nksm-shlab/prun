@@ -9,7 +9,7 @@ prun_maxprocs() {
 #   中断していたら0以外の終了ステータスを返す
 prun() {
   until [ "$PRUN_PIDS_COUNT" -lt "$PRUN_MAX" ]; do
-    [ "$PRUN_ABORTED" ] && prun_killall && return 1
+    [ "$PRUN_ABORTED" ] && prun_interrupt && return 1
     (trap '' TSTP; env sleep 0.3)
     prun_sweep
   done
@@ -29,7 +29,7 @@ prun() {
 
 # 実行を中断する
 prun_abort() {
-  prun_killall
+  prun_interrupt
   PRUN_ABORTED=1
 }
 
@@ -43,7 +43,7 @@ prun_wait() {
   [ $# -gt 0 ] && eval "$1"='$PRUN_STATE' && PRUN_STATE=''
 
   [ "$PRUN_ABORTED" ] || return 0
-  prun_killall
+  prun_interrupt
   PRUN_ABORTED=''
   return 1
 }
@@ -74,8 +74,8 @@ prun_sweep() {
   done
 }
 
-prun_killall() {
-  prun_logger "prun_killall"
+prun_interrupt() {
+  prun_logger "prun_interrupt"
   prun_signal INT
 }
 
@@ -89,14 +89,15 @@ prun_resume() {
   prun_signal CONT
 }
 
-# （内部使用）すべてのプロセスの停止
+# （内部使用）すべてのプロセスにシグナルを送信
 # shellcheck disable=SC2120
 prun_signal() {
-  eval "set -- $1 $PRUN_PIDS"
-  while [ $# -gt 1 ]; do
-    kill -s "$1" -- -"$2" 2>/dev/null || :
-    eval "shift 2; set -- $1 \"\$@\""
+  eval "set -- $PRUN_PIDS -s $1 --"
+  until [ "$1" = -s ]; do
+    set -- "$@" "-$1"
+    shift
   done
+  kill "$@" 2>/dev/null || :
 }
 
 prun_reset
