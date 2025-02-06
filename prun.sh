@@ -36,11 +36,11 @@ prun_abort() {
 # すべてのプロセスが終了するのを待つ
 #   中断していたら0以外の終了ステータスを返す
 prun_wait() {
-  [ $# -gt 0 ] && eval "$1"='$PRUN_STATE' && PRUN_STATE=''
   while prun_sweep && [ "$PRUN_PIDS_COUNT" -gt 0 ]; do
     [ "$PRUN_ABORTED" ] && break
     env sleep 0.2
   done
+  [ $# -gt 0 ] && eval "$1"='$PRUN_STATE' && PRUN_STATE=''
 
   [ "$PRUN_ABORTED" ] || return 0
   prun_killall
