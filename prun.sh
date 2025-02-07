@@ -1,5 +1,9 @@
 # shellcheck shell=sh
 
+# BusyBox ashで「--」が使えないための回避策
+PRUN_KILL_PIDSEP='--'
+kill -s 0 -- $$ 2>/dev/null || PRUN_KILL_PIDSEP=''
+
 prun_maxprocs() {
   PRUN_MAX=$1
 }
@@ -92,12 +96,12 @@ prun_resume() {
 # （内部使用）すべてのプロセスにシグナルを送信
 # shellcheck disable=SC2120
 prun_signal() {
-  eval "set -- $PRUN_PIDS -s $1 --"
+  eval "set -- $PRUN_PIDS -s $1 $PRUN_KILL_PIDSEP"
   until [ "$1" = -s ]; do
     set -- "$@" "-$1"
     shift
   done
-  kill "$@" 2>/dev/null || :
+  kill "$@" || :
 }
 
 prun_reset

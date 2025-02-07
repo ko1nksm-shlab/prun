@@ -53,12 +53,15 @@ suspend() {
   prun_suspend
   kill -s STOP $$ || exit 1
 }
-trap 'suspend' TSTP
 
 resume() {
   prun_resume
 }
-trap 'resume' CONT
+
+if (trap : TSTP && trap : CONT) 2>/dev/null; then
+  trap 'suspend' TSTP
+  trap 'resume' CONT
+fi
 
 # 初期化（4: 最大並列実行数）
 prun_maxprocs 4
