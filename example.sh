@@ -2,31 +2,11 @@
 
 set -eu
 
+PRUN_LOGGER=1
+
 . ./prun.sh
-
-# 標準入力がパイプのときはzshでCTRL+Cで停止できない
-SELF="$0"
-check() {
-  [ -t 0 ] && return
-  if [ -p "${PRUN_FIFO:-}" ]; then
-    exec 0< "$PRUN_FIFO"
-    rm "$PRUN_FIFO"
-    unset PRUN_FIFO
-  else
-    PRUN_FIFO=$(mktemp -u)
-    mkfifo "$PRUN_FIFO"
-    cat > "$PRUN_FIFO" &
-    export PRUN_FIFO
-    "$SELF" "$@"
-    exit
-  fi
-}
-
-if type mkfifo >/dev/null 2>&1; then
-  check "$@"
-else
-  echo mkfifo not found >&2
-fi
+PRUN_ENABLE_SH_WORKAROUND=1
+prun_init "$0" "$@"
 
 task() {
   trap "echo task $1: int" INT

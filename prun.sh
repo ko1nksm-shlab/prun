@@ -1,8 +1,36 @@
 # shellcheck shell=sh
 
+# 制限事項
+#   標準入力がパイプのときはzshでCTRL+Cで停止できない
+
+PRUN_ENABLE_SH_WORKAROUND=''
+
 # BusyBox ashで「--」が使えないための回避策
 PRUN_KILL_PIDSEP='--'
 kill -s 0 -- $$ 2>/dev/null || PRUN_KILL_PIDSEP=''
+
+prun_init() {
+  [ "$PRUN_ENABLE_SH_WORKAROUND" ] || return
+  [ -t 0 ] && return
+  type mkfifo >/dev/null 2>&1 || return
+
+  # 標準入力がパイプのときにdashとNetBSD shで動作しない問題の回避策
+  # （FreeBSD shでは動作する）
+  if [ -p "${PRUN_FIFO:-}" ]; then
+    prun_logger "prun_sh_workaround: run"
+    exec 0< "$PRUN_FIFO"
+    rm "$PRUN_FIFO"
+    unset PRUN_FIFO
+  else
+    prun_logger "prun_sh_workaround: prepare"
+    PRUN_FIFO=$(mktemp -u)
+    mkfifo "$PRUN_FIFO"
+    cat > "$PRUN_FIFO" &
+    export PRUN_FIFO
+    "$@"
+    exit
+  fi
+}
 
 prun_maxprocs() {
   PRUN_MAX=$1
